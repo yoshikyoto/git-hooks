@@ -1,0 +1,39 @@
+#!/usr/bin/env php
+
+<?php
+
+exec('git diff --cached --name-status --diff-filter=ACM', $lines);
+foreach ($lines as $line) {
+    $file = trim(substr($line, 1));
+    // PHP
+    if (pathinfo($file, PATHINFO_EXTENSION) === 'php') {
+        phpSyntaxCheck($file);
+    }
+}
+
+function phpSyntaxCheck($file)
+{
+    exec("php -l $file", $output, $status);
+    if ($status !== 0) {
+        echo implode(PHP_EOL, $output), PHP_EOL;
+        exit(1);
+    }
+}
+
+function phpCsFixer($file)
+{
+    $path = join(DIRECTORY_SEPARATOR, ['vendor', 'bin', 'php-cs-fixer']);
+    $output = getOutput();
+    exec("$path fix --diff --config .php_cs.dist $file 2>$output", $output);
+    // `php-cs-fixer fix` はコード修正したときも終了ステータスは0なので、出力を見て修正したかどうか判断する
+    // 修正があったときだけ `git add` しているのは部分ステージしてあるファイルを `git add` しないようにするため
+    if (count($output) > 2) {
+        echo implode(PHP_EOL, $output), PHP_EOL;
+        exec("git add $file");
+    }
+}
+
+function getOutput()
+{
+    return (DIRECTORY_SEPARATOR == '\\') ? 'NUL' : '/dev/null';
+}
